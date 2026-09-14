@@ -2333,30 +2333,27 @@ ctx.imageSmoothingEnabled=true;
     
     
 let W=960;    
-let H=540;    
-    
-    
-function ajustarCanvas(){    
-    
-H=540;    
-    
-W=Math.max(    
-800,    
-Math.round(    
-H*    
-(    
-window.innerWidth/    
-window.innerHeight    
-)    
-)    
-);    
-    
-canvas.width=W;    
-canvas.height=H;    
-    
-}    
-    
-    
+let H=540;
+let ultimoAnchoCanvas=0;
+let ultimoAltoCanvas=0;
+
+function ajustarCanvas(){
+
+const nuevoH=540;
+const nuevoW=Math.max(800,Math.round(nuevoH*(window.innerWidth/window.innerHeight)));
+
+W=nuevoW;
+H=nuevoH;
+
+if(ultimoAnchoCanvas===W && ultimoAltoCanvas===H) return;
+
+ultimoAnchoCanvas=W;
+ultimoAltoCanvas=H;
+canvas.width=W;
+canvas.height=H;
+
+}
+
 ajustarCanvas();    
     
     
@@ -2369,15 +2366,20 @@ ajustarCanvas
    FONDO
 ============================================================ */
 
+function prepararImagen(imagen){
+  try{ imagen.decoding='async'; }catch(e){}
+  return imagen;
+}
+
 const fondoLirios=
-new Image();
+prepararImagen(new Image());
 
 fondoLirios.src=
 'lirios.jpg';
 
 
 const fondoCempasuchil=
-new Image();
+prepararImagen(new Image());
 
 fondoCempasuchil.src=
 'fondo_cempasuchil.png';
@@ -3750,7 +3752,9 @@ w:100
     
 let plataformas=[];    
     
-let plataformasFlotantes=[];    
+let plataformasFlotantes=[];
+let plataformasSuelo=[];
+let plataformasAereas=[];
     
 let monedas=[];    
     
@@ -4798,6 +4802,9 @@ const posicionesFloresPorMundo={
   
 };
 
+plataformasSuelo=plataformas.filter(p=>p.color==='suelo');
+plataformasAereas=plataformas.filter(p=>p.color==='flotante');
+
 const posicionesFlores=
   posicionesFloresPorMundo[mundoActual] ||
   posicionesLirios;
@@ -5421,12 +5428,6 @@ X
     
 player.x+=    
 player.vx;    
-    
-    
-const plataformasAereas=    
-plataformas.filter(    
-p=>p.color==='flotante'    
-);    
     
     
 plataformasAereas.forEach(    
@@ -6056,7 +6057,7 @@ function dibujarProfundidad(){
   if(!window.fondoBiblioteca){
 
     window.fondoBiblioteca=
-      new Image();
+      prepararImagen(new Image());
 
     window.fondoBiblioteca.src=
       'biblioteca2.jpg';
@@ -8910,6 +8911,11 @@ function dibujarPolenCempasuchil(){
 
   ctx.restore();
 }
+function esVisibleEnMundo(x,y,w,h,margen){
+  const m=margen===undefined?80:margen;
+  return x+w>=camaraX-m && x<=camaraX+W+m && y+h>=-m && y<=H+m;
+}
+
 function dibujar(){
 
   ctx.clearRect(
@@ -9477,39 +9483,19 @@ ctx.translate(
 
 /* flores del paisaje */
     
-for(    
-let x=70;    
-x<WORLD_WIDTH;    
-x+=170    
-){    
-    
-dibujarFlor(    
-x,    
-GROUND_Y-7,    
-Math.floor(    
-x/170    
-)%3===0    
-);    
-    
+const inicioFlores=Math.max(70,Math.floor((camaraX-120)/170)*170);
+const finFlores=Math.min(WORLD_WIDTH,camaraX+W+120);
+for(let x=inicioFlores;x<=finFlores;x+=170){
+  dibujarFlor(x,GROUND_Y-7,Math.floor(x/170)%3===0);
 }    
     
     
 /* hierba */    
     
-for(    
-let x=25;    
-x<WORLD_WIDTH;    
-x+=105    
-){    
-    
-dibujarHierba(    
-x,    
-GROUND_Y-3,    
-Math.floor(    
-x/105    
-)%3    
-);    
-    
+const inicioHierba=Math.max(25,Math.floor((camaraX-120)/105)*105);
+const finHierba=Math.min(WORLD_WIDTH,camaraX+W+120);
+for(let x=inicioHierba;x<=finHierba;x+=105){
+  dibujarHierba(x,GROUND_Y-3,Math.floor(x/105)%3);
 }    
     
     
@@ -9529,10 +9515,7 @@ dibujarHueco(h);
     
 /* plataformas */    
     
-plataformas    
-.filter(    
-p=>p.color==='flotante'    
-)    
+plataformasAereas    
 .forEach(    
 (p,i)=>{    
     
@@ -9548,7 +9531,8 @@ i
 /* obstáculos */    
     
 obstaculos.forEach(    
-o=>{    
+o=>{
+if(o.x!==undefined && !esVisibleEnMundo(o.x,o.y,o.w||100,o.h||100,120)) return;
 dibujarObstaculo(o);    
 }    
 );    
@@ -9557,7 +9541,8 @@ dibujarObstaculo(o);
 /* letreros */    
     
 decoraciones.forEach(    
-d=>{    
+d=>{
+if(!esVisibleEnMundo(d.x,d.y,180,100,120)) return;
 dibujarLetrero(d);    
 }    
 );    
@@ -10404,7 +10389,7 @@ function dibujarLucesF1(){
      🩵 LUCES LED DEL CIRCUITO
   ============================================================ */
 
-  const luces=[
+  const luces=dibujarLucesF1.luces || (dibujarLucesF1.luces=[
     {x:180,y:GROUND_Y-55},
     {x:560,y:GROUND_Y-75},
     {x:980,y:GROUND_Y-60},
@@ -10413,10 +10398,12 @@ function dibujarLucesF1(){
     {x:2280,y:GROUND_Y-75},
     {x:2700,y:GROUND_Y-60},
     {x:3140,y:GROUND_Y-75}
-  ];
+  ]);
 
   luces.forEach(
     (l,i)=>{
+
+      if(!esVisibleEnMundo(l.x-90,l.y-90,180,180,40)) return;
 
       const pulso=
         .72+
@@ -21429,17 +21416,24 @@ else if(esMundo4){
 LOOP    
 ============================================================ */    
     
-function loop(){    
-    
-if(!juegoActivo)    
-return;    
-    
-actualizar();    
-    
-dibujar();    
-    
-requestAnimationFrame(loop);    
-    
+let ultimoRender=0;
+const esPantallaMovil = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+const intervaloRenderMovil=1000/45;
+
+function loop(ahora){
+
+if(!juegoActivo) return;
+
+actualizar();
+
+/* La lógica sigue a 60 Hz; en móviles limitamos el render gráfico a ~45 FPS. */
+if(!esPantallaMovil || ahora-ultimoRender>=intervaloRenderMovil){
+  ultimoRender=ahora;
+  dibujar();
+}
+
+requestAnimationFrame(loop);
+
 }    
     
     
